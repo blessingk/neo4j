@@ -136,7 +136,8 @@ describe('IdentityService', () => {
       };
 
       await expect(service.linkOnLogin(dto)).rejects.toThrow('No linking attribute provided (email/phone/identity).');
-      expect(mockSession.close).toHaveBeenCalled();
+      // Session should not be created when no linking attribute is provided
+      expect(mockSession.close).not.toHaveBeenCalled();
     });
 
     it('should handle database errors gracefully', async () => {

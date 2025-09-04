@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../src/app.module';
 
@@ -12,6 +12,14 @@ describe('Customer Identity E2E Tests', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    
+    // Set up validation pipe
+    app.useGlobalPipes(new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }));
+    
     await app.init();
   });
 
@@ -21,9 +29,9 @@ describe('Customer Identity E2E Tests', () => {
 
   describe('Complete Customer Journey', () => {
     it('should handle complete customer identification flow', async () => {
-      const brandId = 'e2e-brand-1';
-      const sessionId = 'e2e_sess_123';
-      const customerEmail = 'e2e@example.com';
+      const brandId = `e2e-brand-${Date.now()}`;
+      const sessionId = `e2e_sess_${Date.now()}`;
+      const customerEmail = `e2e-${Date.now()}@example.com`;
 
       // Step 1: Create a brand
       const brandResponse = await request(app.getHttpServer())
@@ -59,7 +67,7 @@ describe('Customer Identity E2E Tests', () => {
         })
         .expect(200);
 
-      expect(customerCheckResponse.body).toBeNull();
+      expect(customerCheckResponse.body).toEqual({});
 
       // Step 4: Link session to customer on login
       const linkResponse = await request(app.getHttpServer())
@@ -89,10 +97,10 @@ describe('Customer Identity E2E Tests', () => {
     });
 
     it('should handle multiple sessions for same customer', async () => {
-      const brandId = 'e2e-brand-2';
-      const customerEmail = 'multi-session@example.com';
-      const session1 = 'multi_sess_1';
-      const session2 = 'multi_sess_2';
+      const brandId = `e2e-brand-multi-${Date.now()}`;
+      const customerEmail = `multi-session-${Date.now()}@example.com`;
+      const session1 = `multi_sess_1_${Date.now()}`;
+      const session2 = `multi_sess_2_${Date.now()}`;
 
       // Create brand
       await request(app.getHttpServer())

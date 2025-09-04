@@ -49,6 +49,12 @@ export class IdentityService {
   // Called once user authenticates; links session -> customer
   async linkOnLogin(dto: LoginLinkDto) {
     let session;
+    
+    // Check for linking attributes before trying database operations
+    if (!dto.email && !dto.phone && !dto.customerId) {
+      throw new Error('No linking attribute provided (email/phone/identity).');
+    }
+
     try {
       session = this.neo.session();
       if (dto.email) {
@@ -75,7 +81,15 @@ export class IdentityService {
     try {
       session = this.neo.session();
       const res = await session.run(LOOKUP_SESSION_CUSTOMER, { provider, externalSessionId });
-      return res.records[0]?.get('c')?.properties ?? null;
+      
+      // If no records returned, return null
+      if (res.records.length === 0) {
+        return null;
+      }
+      
+      const customer = res.records[0]?.get('c')?.properties;
+      // Return null if customer is undefined, null, or empty object
+      return customer && Object.keys(customer).length > 0 ? customer : null;
     } catch (error) {
       console.error('Neo4j operation failed:', error.message);
       throw new Error('Database operation failed');

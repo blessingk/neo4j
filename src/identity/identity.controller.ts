@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, HttpException, HttpStatus } from '@nestjs/common';
 import { IdentityService } from './identity.service';
 import { IdentifyDto, Provider } from './dto/identify.dto';
 import { LoginLinkDto } from './dto/login-link.dto';
@@ -9,25 +9,44 @@ export class IdentityController {
   constructor(private readonly svc: IdentityService) {}
 
   @Post('brand')
-  upsertBrand(@Body() dto: UpsertBrandDto) {
-    return this.svc.upsertBrand(dto.id, dto.name, dto.slug);
+  async upsertBrand(@Body() dto: UpsertBrandDto) {
+    try {
+      return await this.svc.upsertBrand(dto.id, dto.name, dto.slug);
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   @Post('identify')
-  identify(@Body() dto: IdentifyDto) {
-    return this.svc.identify(dto);
+  async identify(@Body() dto: IdentifyDto) {
+    try {
+      return await this.svc.identify(dto);
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   @Post('link-login')
-  link(@Body() dto: LoginLinkDto) {
-    return this.svc.linkOnLogin(dto);
+  async link(@Body() dto: LoginLinkDto) {
+    try {
+      return await this.svc.linkOnLogin(dto);
+    } catch (error) {
+      if (error.message === 'No linking attribute provided (email/phone/identity).') {
+        throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+      }
+      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   @Get('customer-for-session')
-  getCustomer(
+  async getCustomer(
     @Query('provider') provider: Provider,
     @Query('externalSessionId') externalSessionId: string
   ) {
-    return this.svc.getCustomerForSession(provider, externalSessionId);
+    try {
+      return await this.svc.getCustomerForSession(provider, externalSessionId);
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 }

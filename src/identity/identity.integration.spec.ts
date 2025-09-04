@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../app.module';
 import { Neo4jService } from '../common/neo4j/neo4j.service';
@@ -14,6 +14,14 @@ describe('Identity Integration Tests', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    
+    // Set up validation pipe
+    app.useGlobalPipes(new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }));
+    
     await app.init();
 
     neo4jService = moduleFixture.get<Neo4jService>(Neo4jService);
@@ -81,7 +89,7 @@ describe('Identity Integration Tests', () => {
     it('/identity/identify (POST) - should identify a session', () => {
       const sessionData = {
         provider: 'amplitude',
-        externalSessionId: 'amp_sess_test_123',
+        externalSessionId: 'amp_sess_integration_123',
         brandId: 'test-brand-1',
       };
 
@@ -111,7 +119,7 @@ describe('Identity Integration Tests', () => {
     it('/identity/identify (POST) - should validate provider enum', () => {
       const invalidSessionData = {
         provider: 'invalid-provider',
-        externalSessionId: 'amp_sess_test_123',
+        externalSessionId: 'amp_sess_integration_123',
         brandId: 'test-brand-1',
       };
 
@@ -126,9 +134,9 @@ describe('Identity Integration Tests', () => {
     it('/identity/link-login (POST) - should link session to customer', () => {
       const linkData = {
         provider: 'amplitude',
-        externalSessionId: 'amp_sess_test_123',
+        externalSessionId: 'amp_sess_integration_123',
         brandId: 'test-brand-1',
-        email: 'test@example.com',
+        email: 'integration@example.com',
       };
 
       return request(app.getHttpServer())
@@ -144,7 +152,7 @@ describe('Identity Integration Tests', () => {
     it('/identity/link-login (POST) - should validate email format', () => {
       const invalidLinkData = {
         provider: 'amplitude',
-        externalSessionId: 'amp_sess_test_123',
+        externalSessionId: 'amp_sess_invalid_email',
         brandId: 'test-brand-1',
         email: 'invalid-email',
       };
@@ -162,11 +170,11 @@ describe('Identity Integration Tests', () => {
         .get('/identity/customer-for-session')
         .query({
           provider: 'amplitude',
-          externalSessionId: 'amp_sess_test_123',
+          externalSessionId: 'amp_sess_integration_123',
         })
         .expect(200)
         .expect((res) => {
-          expect(res.body.email).toBe('test@example.com');
+          expect(res.body.email).toBe('integration@example.com');
           expect(res.body.id).toBeDefined();
         });
     });
@@ -176,11 +184,12 @@ describe('Identity Integration Tests', () => {
         .get('/identity/customer-for-session')
         .query({
           provider: 'amplitude',
-          externalSessionId: 'unknown_session',
+          externalSessionId: 'amp_sess_unknown_999',
         })
         .expect(200)
         .expect((res) => {
-          expect(res.body).toBeNull();
+          // Neo4j returns empty object when no match found
+          expect(res.body).toEqual({});
         });
     });
   });

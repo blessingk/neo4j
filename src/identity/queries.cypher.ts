@@ -15,9 +15,12 @@ RETURN s
 `;
 
 export const LOOKUP_SESSION_CUSTOMER = `
-MATCH (s:Session {provider: $provider, externalId: $externalSessionId})
+OPTIONAL MATCH (s:Session {provider: $provider, externalId: $externalSessionId})
 OPTIONAL MATCH (s)-[:BELONGS_TO]->(c:Customer)
-RETURN c LIMIT 1
+RETURN CASE 
+  WHEN s IS NULL OR c IS NULL THEN null 
+  ELSE c 
+END as c
 `;
 
 export const LINK_SESSION_TO_CUSTOMER_BY_EMAIL = `
