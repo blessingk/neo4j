@@ -8,10 +8,12 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({
     transform: true,
     whitelist: true,
+    forbidNonWhitelisted: true,
   }));
   
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  console.log(`Application is running on: http://localhost:${port}`);
+  console.log(`🚀 Customer Identity Service running on: http://localhost:${port}`);
+  console.log(`📊 Neo4j Browser available at: http://localhost:7474`);
 }
 bootstrap();
