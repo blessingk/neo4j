@@ -29,12 +29,11 @@ describe('DTO Validation', () => {
     it('should fail validation with missing required fields', async () => {
       const dto = new IdentifyDto();
       dto.provider = Provider.AMPLITUDE;
-      // Missing externalSessionId and brandId
+      // Missing externalSessionId (brandId is now optional)
 
       const errors = await validate(dto);
-      expect(errors).toHaveLength(2);
+      expect(errors).toHaveLength(1);
       expect(errors.some(e => e.property === 'externalSessionId')).toBe(true);
-      expect(errors.some(e => e.property === 'brandId')).toBe(true);
     });
 
     it('should validate optional fields', async () => {
@@ -89,12 +88,11 @@ describe('DTO Validation', () => {
     it('should fail validation with missing required fields', async () => {
       const dto = new LoginLinkDto();
       dto.provider = Provider.AMPLITUDE;
-      // Missing externalSessionId and brandId
+      // Missing externalSessionId (brandId is now optional)
 
       const errors = await validate(dto);
-      expect(errors).toHaveLength(2);
+      expect(errors).toHaveLength(1);
       expect(errors.some(e => e.property === 'externalSessionId')).toBe(true);
-      expect(errors.some(e => e.property === 'brandId')).toBe(true);
     });
   });
 

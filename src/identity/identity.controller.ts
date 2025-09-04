@@ -4,13 +4,12 @@ import { IdentifyDto, Provider } from './dto/identify.dto';
 import { LoginLinkDto } from './dto/login-link.dto';
 import { UpsertBrandDto } from './dto/upsert-brand.dto';
 import { 
-  QuickIdentifyDto, 
-  QuickIdentifyInternalDto,
-  LinkExternalSessionDto,
-  LinkInternalSessionDto,
-  GetCustomerSessionsDto,
-  FindCustomerDto
-} from './dto/enhanced-session.dto';
+  CustomerSessionDto,
+  QuickIdentifyCustomerDto,
+  FindCustomerBySessionDto,
+  UpdateCustomerSessionDto,
+  GetCustomerSessionDto
+} from './dto/single-session.dto';
 
 @Controller('identity')
 export class IdentityController {
@@ -25,69 +24,81 @@ export class IdentityController {
     }
   }
 
+  // Create or update customer's single long-lived session
+  @Post('customer-session')
+  async createOrUpdateCustomerSession(@Body() dto: CustomerSessionDto) {
+    try {
+      return await this.svc.createOrUpdateCustomerSession(dto);
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  // Quick identification by customer email
+  @Get('quick-identify-customer')
+  async quickIdentifyCustomer(@Query() query: QuickIdentifyCustomerDto) {
+    try {
+      return await this.svc.quickIdentifyCustomer(query);
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  // Find customer by any session identifier
+  @Get('find-customer-by-session')
+  async findCustomerBySession(@Query() query: FindCustomerBySessionDto) {
+    try {
+      return await this.svc.findCustomerBySession(query);
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  // Update customer's session (when they visit again)
+  @Post('update-customer-session')
+  async updateCustomerSession(@Body() dto: UpdateCustomerSessionDto) {
+    try {
+      return await this.svc.updateCustomerSession(dto);
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  // Get customer's single session
+  @Get('customer-session')
+  async getCustomerSession(@Query() query: GetCustomerSessionDto) {
+    try {
+      return await this.svc.getCustomerSession(query);
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  // Get all customers with their sessions
+  @Get('all-customers-sessions')
+  async getAllCustomersWithSessions() {
+    try {
+      return await this.svc.getAllCustomersWithSessions();
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  // Get customer loyalty profile (simplified)
+  @Get('customer-loyalty-profile')
+  async getCustomerLoyaltyProfile(@Query('internalSessionId') internalSessionId: string) {
+    try {
+      return await this.svc.getCustomerLoyaltyProfile(internalSessionId);
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  // Legacy endpoints for backward compatibility
   @Post('identify')
   async identify(@Body() dto: IdentifyDto) {
     try {
       return await this.svc.identify(dto);
-    } catch (error) {
-      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
-
-  @Post('internal-session')
-  async createInternalSession(@Body() dto: { internalSessionId: string; brandId: string }) {
-    try {
-      return await this.svc.createInternalSession(dto.internalSessionId, dto.brandId);
-    } catch (error) {
-      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
-
-  // Quick identification by external session (Braze/Amplitude)
-  @Get('quick-identify-external')
-  async quickIdentifyByExternalSession(@Query() query: QuickIdentifyDto) {
-    try {
-      return await this.svc.quickIdentifyByExternalSession(query);
-    } catch (error) {
-      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
-
-  // Quick identification by internal session (after login)
-  @Get('quick-identify-internal')
-  async quickIdentifyByInternalSession(@Query() query: QuickIdentifyInternalDto) {
-    try {
-      return await this.svc.quickIdentifyByInternalSession(query);
-    } catch (error) {
-      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
-
-  // Link external session to customer (first identification)
-  @Post('link-external-session')
-  async linkExternalSessionToCustomer(@Body() dto: LinkExternalSessionDto) {
-    try {
-      return await this.svc.linkExternalSessionToCustomer(dto);
-    } catch (error) {
-      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
-
-  // Link internal session to customer (after login)
-  @Post('link-internal-session')
-  async linkInternalSessionToCustomer(@Body() dto: LinkInternalSessionDto) {
-    try {
-      return await this.svc.linkInternalSessionToCustomer(dto);
-    } catch (error) {
-      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
-
-  // Link internal session to existing external sessions (stitching)
-  @Post('link-internal-to-existing')
-  async linkInternalToExistingSessions(@Body() dto: LinkInternalSessionDto) {
-    try {
-      return await this.svc.linkInternalToExistingSessions(dto);
     } catch (error) {
       throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
     }
@@ -98,7 +109,7 @@ export class IdentityController {
     try {
       return await this.svc.linkOnLogin(dto);
     } catch (error) {
-      if (error.message === 'No linking attribute provided (email/phone/identity).') {
+      if (error.message === 'Email is required for session linking') {
         throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
       }
       throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
@@ -111,34 +122,21 @@ export class IdentityController {
     @Query('externalSessionId') externalSessionId: string
   ) {
     try {
-      return await this.svc.getCustomerForSession(provider, externalSessionId);
-    } catch (error) {
-      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
-
-  @Get('find-customer')
-  async findCustomerByAnySession(@Query() query: FindCustomerDto) {
-    try {
-      return await this.svc.findCustomerByAnySession(query);
-    } catch (error) {
-      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
-
-  @Get('customer-with-sessions')
-  async getCustomerWithSessions(@Query() query: GetCustomerSessionsDto) {
-    try {
-      return await this.svc.getCustomerWithSessions(query);
-    } catch (error) {
-      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
-
-  @Get('customer-latest-session')
-  async getCustomerLatestSession(@Query('email') email: string) {
-    try {
-      return await this.svc.getCustomerLatestSession(email);
+      // Map provider to appropriate session field
+      let brazeSession = null;
+      let amplitudeSession = null;
+      
+      if (provider === 'braze' && externalSessionId) {
+        brazeSession = externalSessionId;
+      } else if (provider === 'amplitude' && externalSessionId) {
+        amplitudeSession = externalSessionId;
+      }
+      
+      const result = await this.svc.findCustomerBySession({ 
+        brazeSession, 
+        amplitudeSession 
+      });
+      return result?.customer || null;
     } catch (error) {
       throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
     }

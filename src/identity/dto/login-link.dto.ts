@@ -2,8 +2,9 @@ import { IsEmail, IsOptional, IsString, IsEnum } from 'class-validator';
 import { Provider } from './identify.dto';
 
 export class LoginLinkDto {
+  @IsOptional()
   @IsString() 
-  brandId: string;
+  brandId?: string;
 
   @IsEnum(Provider) 
   provider: Provider;
@@ -26,4 +27,8 @@ export class LoginLinkDto {
   @IsOptional() 
   @IsString() 
   name?: string;
+
+  @IsOptional()
+  @IsString()
+  internalSessionId?: string;  // our internal session ID (primary identifier)
 }

@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsEmail } from 'class-validator';
 
 export enum Provider { 
   BRAZE = 'braze', 
@@ -13,8 +13,17 @@ export class IdentifyDto {
   @IsString() 
   externalSessionId: string;          // e.g. braze session id
 
+  @IsOptional()
   @IsString() 
-  brandId: string;                    // our known brand id
+  brandId?: string;                    // our known brand id (optional for unified identity)
+
+  @IsOptional()
+  @IsEmail()
+  email?: string;                      // customer email for session creation
+
+  @IsOptional()
+  @IsString()
+  internalSessionId?: string;           // our internal session ID (primary identifier)
 
   @IsOptional() 
   @IsString() 
@@ -27,8 +36,4 @@ export class IdentifyDto {
   @IsOptional() 
   @IsString() 
   userAgent?: string;
-
-  @IsOptional() 
-  @IsString() 
-  internalSessionId?: string; // if you also generate your own
 }

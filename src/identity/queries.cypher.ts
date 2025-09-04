@@ -1,98 +1,127 @@
-// Enhanced queries for the new workflow
+// Simplified queries for one long-lived session per customer using internal session ID
 export const UPSERT_BRAND = `
 MERGE (b:Brand {id: $brandId})
 SET b.name = $name, b.slug = $slug
 RETURN b
 `;
 
-export const UPSERT_SESSION = `
-MERGE (s:Session {provider: $provider, externalId: $externalSessionId})
-ON CREATE SET s.id = randomUUID(), s.createdAt = datetime()
-SET s.lastSeenAt = datetime()
-WITH s
-MATCH (b:Brand {id: $brandId})
-MERGE (s)-[:FOR_BRAND]->(b)
-RETURN s
-`;
-
-export const UPSERT_INTERNAL_SESSION = `
-MERGE (s:Session {provider: 'internal', externalId: $internalSessionId})
-ON CREATE SET s.id = randomUUID(), s.createdAt = datetime()
-SET s.lastSeenAt = datetime()
-WITH s
-MATCH (b:Brand {id: $brandId})
-MERGE (s)-[:FOR_BRAND]->(b)
-RETURN s
-`;
-
-// Quick identification by stable external sessions (Braze/Amplitude)
-export const QUICK_IDENTIFY_BY_EXTERNAL_SESSION = `
-MATCH (s:Session {provider: $provider, externalId: $externalSessionId})
-OPTIONAL MATCH (s)-[:BELONGS_TO]->(c:Customer)
-RETURN s, c
-`;
-
-// Quick identification by internal session (after login)
-export const QUICK_IDENTIFY_BY_INTERNAL_SESSION = `
-MATCH (s:Session {provider: 'internal', externalId: $internalSessionId})
-OPTIONAL MATCH (s)-[:BELONGS_TO]->(c:Customer)
-RETURN s, c
-`;
-
-// Link external session to customer (when we first identify them)
-export const LINK_EXTERNAL_SESSION_TO_CUSTOMER = `
-MERGE (c:Customer {email: $email})
+// Create or update customer's single long-lived session using internal session ID
+export const UPSERT_CUSTOMER_SESSION = `
+MERGE (c:Customer {internalSessionId: $internalSessionId})
 ON CREATE SET c.id = randomUUID(), c.createdAt = datetime()
+ON MATCH SET c.email = $email
 WITH c
-MATCH (s:Session {provider: $provider, externalId: $externalSessionId})
-MERGE (s)-[:BELONGS_TO]->(c)
-RETURN c
-`;
-
-// Link internal session to customer (after login)
-export const LINK_INTERNAL_SESSION_TO_CUSTOMER = `
-MERGE (c:Customer {email: $email})
-ON CREATE SET c.id = randomUUID(), c.createdAt = datetime()
+FOREACH (email IN CASE WHEN $email IS NOT NULL THEN [$email] ELSE [] END |
+  SET c.email = email
+)
 WITH c
-MATCH (s:Session {provider: 'internal', externalId: $internalSessionId})
-MERGE (s)-[:BELONGS_TO]->(c)
-MERGE (c)-[:LATEST_SESSION]->(s)
-RETURN c
-`;
-
-// Link internal session to existing external sessions (stitching)
-export const LINK_INTERNAL_TO_EXISTING_SESSIONS = `
-MATCH (c:Customer {email: $email})
-WITH c
-MATCH (s:Session {provider: 'internal', externalId: $internalSessionId})
-MERGE (s)-[:BELONGS_TO]->(c)
-MERGE (c)-[:LATEST_SESSION]->(s)
+MERGE (s:Session {internalSessionId: $internalSessionId})
+ON CREATE SET s.id = randomUUID(), s.createdAt = datetime()
+SET s.lastSeenAt = datetime(),
+    s.brandId = $brandId
 WITH c, s
-MATCH (existingSession:Session)-[:BELONGS_TO]->(c)
-WHERE existingSession.provider IN ['braze', 'amplitude']
-MERGE (s)-[:LINKED_TO]->(existingSession)
-RETURN c
+FOREACH (email IN CASE WHEN $email IS NOT NULL THEN [$email] ELSE [] END |
+  SET s.email = email
+)
+WITH c, s
+FOREACH (brazeSession IN CASE WHEN $brazeSession IS NOT NULL THEN [$brazeSession] ELSE [] END |
+  SET s.brazeSession = brazeSession
+)
+WITH c, s
+FOREACH (amplitudeSession IN CASE WHEN $amplitudeSession IS NOT NULL THEN [$amplitudeSession] ELSE [] END |
+  SET s.amplitudeSession = amplitudeSession
+)
+WITH c, s
+MERGE (s)-[:BELONGS_TO]->(c)
+WITH c, s
+OPTIONAL MATCH (b:Brand {id: $brandId})
+FOREACH (brand IN CASE WHEN b IS NOT NULL THEN [b] ELSE [] END |
+  MERGE (s)-[:FOR_BRAND]->(brand)
+)
+RETURN c, s
 `;
 
-// Get all sessions for a customer
-export const GET_CUSTOMER_WITH_ALL_SESSIONS = `
-MATCH (c:Customer {email: $email})
-OPTIONAL MATCH (s:Session)-[:BELONGS_TO]->(c)
-RETURN c, collect(s) as sessions
-`;
-
-// Find customer by any session type
-export const FIND_CUSTOMER_BY_ANY_SESSION = `
-MATCH (s:Session)
-WHERE (s.provider = $provider AND s.externalId = $externalSessionId)
-   OR (s.provider = 'internal' AND s.externalId = $internalSessionId)
+// Quick identification by internal session ID
+export const QUICK_IDENTIFY_CUSTOMER = `
+MATCH (s:Session {internalSessionId: $internalSessionId})
 OPTIONAL MATCH (s)-[:BELONGS_TO]->(c:Customer)
-RETURN c
+OPTIONAL MATCH (s)-[:FOR_BRAND]->(b:Brand)
+RETURN s, c, b
+`;
+
+// Find customer by any session identifier
+export const FIND_CUSTOMER_BY_SESSION = `
+MATCH (s:Session)
+WHERE (s.brazeSession = $brazeSession)
+   OR (s.amplitudeSession = $amplitudeSession)
+   OR (s.internalSessionId = $internalSessionId)
+   OR (s.email = $email)
+OPTIONAL MATCH (s)-[:BELONGS_TO]->(c:Customer)
+OPTIONAL MATCH (s)-[:FOR_BRAND]->(b:Brand)
+RETURN s, c, b
 LIMIT 1
 `;
 
-// Get customer's latest session
-export const GET_CUSTOMER_LATEST_SESSION = `
-MATCH (c:Customer {email: $email})-[:LATEST_SESSION]->(s:Session)
+// Update customer's session (when they visit again)
+export const UPDATE_CUSTOMER_SESSION = `
+MATCH (s:Session {internalSessionId: $internalSessionId})
+SET s.lastSeenAt = datetime(),
+    s.brandId = $brandId
+WITH s
+FOREACH (email IN CASE WHEN $email IS NOT NULL THEN [$email] ELSE [] END |
+  SET s.email = email
+)
+WITH s
+OPTIONAL MATCH (s)-[:BELONGS_TO]->(c:Customer)
+FOREACH (email IN CASE WHEN $email IS NOT NULL THEN [$email] ELSE [] END |
+  SET c.email = email
+)
+WITH s
+FOREACH (brazeSession IN CASE WHEN $brazeSession IS NOT NULL THEN [$brazeSession] ELSE [] END |
+  SET s.brazeSession = brazeSession
+)
+WITH s
+FOREACH (amplitudeSession IN CASE WHEN $amplitudeSession IS NOT NULL THEN [$amplitudeSession] ELSE [] END |
+  SET s.amplitudeSession = amplitudeSession
+)
+WITH s
+OPTIONAL MATCH (b:Brand {id: $brandId})
+FOREACH (brand IN CASE WHEN b IS NOT NULL THEN [b] ELSE [] END |
+  MERGE (s)-[:FOR_BRAND]->(brand)
+)
 RETURN s
+`;
+
+// Get customer's single session with all details
+export const GET_CUSTOMER_SESSION = `
+MATCH (c:Customer {internalSessionId: $internalSessionId})
+OPTIONAL MATCH (s:Session {internalSessionId: $internalSessionId})
+OPTIONAL MATCH (s)-[:FOR_BRAND]->(b:Brand)
+RETURN c, s, b
+`;
+
+// Get all customers with their sessions
+export const GET_ALL_CUSTOMERS_WITH_SESSIONS = `
+MATCH (c:Customer)
+OPTIONAL MATCH (s:Session {internalSessionId: c.internalSessionId})
+OPTIONAL MATCH (s)-[:FOR_BRAND]->(b:Brand)
+RETURN c, s, b
+ORDER BY s.lastSeenAt DESC
+`;
+
+// Get customer loyalty profile (simplified)
+export const GET_CUSTOMER_LOYALTY_PROFILE = `
+MATCH (c:Customer {internalSessionId: $internalSessionId})
+OPTIONAL MATCH (s:Session {internalSessionId: $internalSessionId})
+OPTIONAL MATCH (s)-[:FOR_BRAND]->(b:Brand)
+RETURN c, s, b
+`;
+
+// Find customer by email (for email changes)
+export const FIND_CUSTOMER_BY_EMAIL = `
+MATCH (s:Session {email: $email})
+OPTIONAL MATCH (s)-[:BELONGS_TO]->(c:Customer)
+OPTIONAL MATCH (s)-[:FOR_BRAND]->(b:Brand)
+RETURN s, c, b
+LIMIT 1
 `;

@@ -10,11 +10,17 @@ describe('IdentityController', () => {
   let service: IdentityService;
 
   const mockIdentityService = {
-    upsertBrand: jest.fn(),
-    identify: jest.fn(),
-    linkOnLogin: jest.fn(),
-    getCustomerForSession: jest.fn(),
-  };
+  upsertBrand: jest.fn(),
+  identify: jest.fn(),
+  linkOnLogin: jest.fn(),
+  findCustomerBySession: jest.fn(),
+  createOrUpdateCustomerSession: jest.fn(),
+  quickIdentifyCustomer: jest.fn(),
+  updateCustomerSession: jest.fn(),
+  getCustomerSession: jest.fn(),
+  getAllCustomersWithSessions: jest.fn(),
+  getCustomerLoyaltyProfile: jest.fn(),
+};
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -91,26 +97,36 @@ describe('IdentityController', () => {
 
   describe('getCustomer', () => {
     it('should return customer for session', async () => {
-      const provider = Provider.AMPLITUDE;
-      const externalSessionId = 'amp_sess_123';
+      const provider = 'braze';
+      const externalSessionId = 'braze_sess_123';
       const expectedResult = { id: 'customer-1', email: 'test@example.com' };
-      mockIdentityService.getCustomerForSession.mockResolvedValue(expectedResult);
+      mockIdentityService.findCustomerBySession.mockResolvedValue({
+        customer: expectedResult,
+        session: { id: 'session-1' },
+        brand: { id: 'brand-1' }
+      });
 
-      const result = await controller.getCustomer(provider, externalSessionId);
+      const result = await controller.getCustomer(provider as any, externalSessionId);
 
       expect(result).toEqual(expectedResult);
-      expect(mockIdentityService.getCustomerForSession).toHaveBeenCalledWith(provider, externalSessionId);
+      expect(mockIdentityService.findCustomerBySession).toHaveBeenCalledWith({
+        brazeSession: 'braze_sess_123',
+        amplitudeSession: null
+      });
     });
 
     it('should return null when customer not found', async () => {
-      const provider = Provider.AMPLITUDE;
-      const externalSessionId = 'amp_sess_123';
-      mockIdentityService.getCustomerForSession.mockResolvedValue(null);
+      const provider = 'braze';
+      const externalSessionId = 'braze_sess_123';
+      mockIdentityService.findCustomerBySession.mockResolvedValue(null);
 
-      const result = await controller.getCustomer(provider, externalSessionId);
+      const result = await controller.getCustomer(provider as any, externalSessionId);
 
       expect(result).toBeNull();
-      expect(mockIdentityService.getCustomerForSession).toHaveBeenCalledWith(provider, externalSessionId);
+      expect(mockIdentityService.findCustomerBySession).toHaveBeenCalledWith({
+        brazeSession: 'braze_sess_123',
+        amplitudeSession: null
+      });
     });
   });
 });

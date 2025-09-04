@@ -9,8 +9,9 @@ export class QuickIdentifyDto {
   @IsString()
   externalSessionId: string;
 
+  @IsOptional()
   @IsString()
-  brandId: string;
+  brandId?: string;
 }
 
 // Quick identification by internal session (after login)
@@ -30,8 +31,9 @@ export class LinkExternalSessionDto {
   @IsString()
   externalSessionId: string;
 
+  @IsOptional()
   @IsString()
-  brandId: string;
+  brandId?: string;
 }
 
 // Link internal session to customer (after login)
@@ -42,8 +44,9 @@ export class LinkInternalSessionDto {
   @IsString()
   internalSessionId: string;
 
+  @IsOptional()
   @IsString()
-  brandId: string;
+  brandId?: string;
 }
 
 // Get customer with all sessions

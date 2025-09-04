@@ -155,19 +155,30 @@ describe('IdentityService', () => {
     });
   });
 
-  describe('getCustomerForSession', () => {
-    it('should return customer when found', async () => {
+  describe('findCustomerBySession', () => {
+    it('should return customer when found by braze session', async () => {
       const mockResult = {
-        records: [{ get: () => ({ properties: { id: 'customer-1', email: 'test@example.com' } }) }],
+        records: [{ 
+          get: jest.fn()
+            .mockReturnValueOnce({ properties: { id: 'customer-1', email: 'test@example.com' } }) // session
+            .mockReturnValueOnce({ properties: { id: 'customer-1', email: 'test@example.com' } }) // customer
+            .mockReturnValueOnce(undefined) // brand
+        }],
       };
       mockSession.run.mockResolvedValue(mockResult);
 
-      const result = await service.getCustomerForSession(Provider.AMPLITUDE, 'amp_sess_123');
+      const result = await service.findCustomerBySession({ brazeSession: 'braze_sess_123' });
 
-      expect(result).toEqual({ id: 'customer-1', email: 'test@example.com' });
+      expect(result).toEqual({
+        session: { id: 'customer-1', email: 'test@example.com' },
+        customer: { id: 'customer-1', email: 'test@example.com' },
+        brand: undefined
+      });
       expect(mockSession.run).toHaveBeenCalledWith(expect.any(String), {
-        provider: 'amplitude',
-        externalSessionId: 'amp_sess_123',
+        brazeSession: 'braze_sess_123',
+        amplitudeSession: null,
+        internalSessionId: null,
+        email: null,
       });
       expect(mockSession.close).toHaveBeenCalled();
     });
@@ -178,7 +189,7 @@ describe('IdentityService', () => {
       };
       mockSession.run.mockResolvedValue(mockResult);
 
-      const result = await service.getCustomerForSession(Provider.AMPLITUDE, 'amp_sess_123');
+      const result = await service.findCustomerBySession({ brazeSession: 'braze_sess_123' });
 
       expect(result).toBeNull();
       expect(mockSession.close).toHaveBeenCalled();
@@ -187,7 +198,7 @@ describe('IdentityService', () => {
     it('should handle database errors gracefully', async () => {
       mockSession.run.mockRejectedValue(new Error('Database error'));
 
-      await expect(service.getCustomerForSession(Provider.AMPLITUDE, 'amp_sess_123')).rejects.toThrow('Database operation failed');
+      await expect(service.findCustomerBySession({ brazeSession: 'braze_sess_123' })).rejects.toThrow('Database operation failed');
       expect(mockSession.close).toHaveBeenCalled();
     });
   });
