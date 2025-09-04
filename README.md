@@ -14,21 +14,12 @@ This will:
 - Install dependencies
 - Create `.env` file from template
 
-2. **Bootstrap Neo4j constraints:**
-Open Neo4j Browser at http://localhost:7474 and run:
-```cypher
-CREATE CONSTRAINT customer_id IF NOT EXISTS
-FOR (c:Customer) REQUIRE c.id IS UNIQUE;
-
-CREATE CONSTRAINT brand_id IF NOT EXISTS
-FOR (b:Brand) REQUIRE b.id IS UNIQUE;
-
-CREATE CONSTRAINT identity_unique IF NOT EXISTS
-FOR (i:Identity) REQUIRE (i.provider, i.externalId) IS UNIQUE;
-
-CREATE CONSTRAINT session_unique IF NOT EXISTS
-FOR (s:Session) REQUIRE (s.provider, s.externalId) IS UNIQUE;
+2. **Set up Neo4j constraints:**
+```bash
+./setup-neo4j.sh
 ```
+
+This will automatically create all required database constraints.
 
 3. **Start the service:**
 ```bash

@@ -30,14 +30,24 @@ else
     echo "✅ .env file already exists."
 fi
 
+# Set up Neo4j constraints
+echo "🔧 Setting up Neo4j constraints..."
+if [ -f ./setup-neo4j.sh ]; then
+    chmod +x ./setup-neo4j.sh
+    ./setup-neo4j.sh
+else
+    echo "⚠️  setup-neo4j.sh not found. Please run it manually after setup."
+fi
+
 echo ""
 echo "🎉 Setup complete!"
 echo ""
 echo "Next steps:"
-echo "1. Open Neo4j Browser at http://localhost:7474"
-echo "2. Run the constraints from neo4j-bootstrap.cypher"
-echo "3. Start the service: npm run start:dev"
+echo "1. Start the service: npm run start:dev"
+echo "2. Test the API endpoints (see examples below)"
 echo ""
 echo "Default Neo4j credentials:"
 echo "  Username: neo4j"
 echo "  Password: localpassword"
+echo ""
+echo "Neo4j Browser: http://localhost:7474"

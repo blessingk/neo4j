@@ -6,10 +6,19 @@ export class Neo4jService implements OnModuleDestroy {
   constructor(@Inject('NEO4J_DRIVER') private readonly driver: Driver) {}
 
   session(): Session {
-    return this.driver.session();
+    try {
+      return this.driver.session();
+    } catch (error) {
+      console.error('Failed to create Neo4j session:', error.message);
+      throw new Error('Neo4j connection not available');
+    }
   }
 
   async onModuleDestroy() {
-    await this.driver.close();
+    try {
+      await this.driver.close();
+    } catch (error) {
+      console.warn('Error closing Neo4j driver:', error.message);
+    }
   }
 }

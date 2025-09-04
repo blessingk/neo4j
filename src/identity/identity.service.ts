@@ -14,34 +14,43 @@ export class IdentityService {
   constructor(private readonly neo: Neo4jService) {}
 
   async upsertBrand(id: string, name: string, slug: string) {
-    const session = this.neo.session();
+    let session;
     try {
+      session = this.neo.session();
       const res = await session.run(UPSERT_BRAND, { brandId: id, name, slug });
       return res.records[0]?.get('b').properties;
+    } catch (error) {
+      console.error('Neo4j operation failed:', error.message);
+      throw new Error('Database operation failed');
     } finally { 
-      await session.close(); 
+      if (session) await session.close(); 
     }
   }
 
   // Called on each visit or event ping (anonymous allowed)
   async identify(dto: IdentifyDto) {
-    const session = this.neo.session();
+    let session;
     try {
+      session = this.neo.session();
       const res = await session.run(UPSERT_SESSION, {
         brandId: dto.brandId,
         provider: dto.provider,
         externalSessionId: dto.externalSessionId,
       });
       return res.records[0].get('s').properties;
+    } catch (error) {
+      console.error('Neo4j operation failed:', error.message);
+      throw new Error('Database operation failed');
     } finally { 
-      await session.close(); 
+      if (session) await session.close(); 
     }
   }
 
   // Called once user authenticates; links session -> customer
   async linkOnLogin(dto: LoginLinkDto) {
-    const session = this.neo.session();
+    let session;
     try {
+      session = this.neo.session();
       if (dto.email) {
         const res = await session.run(LINK_SESSION_TO_CUSTOMER_BY_EMAIL, {
           email: dto.email,
@@ -52,19 +61,26 @@ export class IdentityService {
       }
       // You can add phone-based or identity-based linking variants here.
       throw new Error('No linking attribute provided (email/phone/identity).');
+    } catch (error) {
+      console.error('Neo4j operation failed:', error.message);
+      throw new Error('Database operation failed');
     } finally { 
-      await session.close(); 
+      if (session) await session.close(); 
     }
   }
 
   // Resolve: do we already know who this session belongs to?
   async getCustomerForSession(provider: Provider, externalSessionId: string) {
-    const session = this.neo.session();
+    let session;
     try {
+      session = this.neo.session();
       const res = await session.run(LOOKUP_SESSION_CUSTOMER, { provider, externalSessionId });
       return res.records[0]?.get('c')?.properties ?? null;
+    } catch (error) {
+      console.error('Neo4j operation failed:', error.message);
+      throw new Error('Database operation failed');
     } finally { 
-      await session.close(); 
+      if (session) await session.close(); 
     }
   }
 }
