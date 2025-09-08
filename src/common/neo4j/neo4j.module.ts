@@ -1,5 +1,7 @@
 import { Module, Global } from '@nestjs/common';
 import neo4j, { Driver } from 'neo4j-driver';
+import { Neo4jOGMService } from './neo4j-ogm.service';
+  import { BrandRepository, SessionRepository } from './repositories';
 
 @Global()
 @Module({
@@ -23,7 +25,17 @@ import neo4j, { Driver } from 'neo4j-driver';
         return driver;
       },
     },
+    {
+      provide: 'NEO4J_OGM',
+      useFactory: async (): Promise<Neo4jOGMService> => {
+        const ogmService = new Neo4jOGMService();
+        await ogmService.initialize();
+        return ogmService;
+      },
+    },
+    BrandRepository,
+    SessionRepository,
   ],
-  exports: ['NEO4J_DRIVER'],
+  exports: ['NEO4J_DRIVER', 'NEO4J_OGM', BrandRepository, SessionRepository],
 })
 export class Neo4jModule {}

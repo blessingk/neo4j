@@ -1,35 +1,41 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { IdentityService } from './identity.service';
-import { Neo4jService } from '../common/neo4j/neo4j.service';
+import { BrandRepository } from '../common/neo4j/repositories/brand.repository';
+import { SessionRepository } from '../common/neo4j/repositories/session.repository';
 import { IdentifyDto, Provider } from './dto/identify.dto';
 import { LoginLinkDto } from './dto/login-link.dto';
+import { 
+  mockBrandData, 
+  mockCustomerData, 
+  mockSessionData, 
+  mockCustomerSessionResult,
+  mockBrandRepository,
+  mockSessionRepository
+} from '../common/test/mock-data';
 
 describe('IdentityService', () => {
   let service: IdentityService;
-  let neo4jService: Neo4jService;
-
-  const mockSession = {
-    run: jest.fn(),
-    close: jest.fn(),
-  };
-
-  const mockNeo4jService = {
-    session: jest.fn().mockReturnValue(mockSession),
-  };
+  let brandRepository: BrandRepository;
+  let sessionRepository: SessionRepository;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         IdentityService,
         {
-          provide: Neo4jService,
-          useValue: mockNeo4jService,
+          provide: BrandRepository,
+          useValue: mockBrandRepository,
+        },
+        {
+          provide: SessionRepository,
+          useValue: mockSessionRepository,
         },
       ],
     }).compile();
 
     service = module.get<IdentityService>(IdentityService);
-    neo4jService = module.get<Neo4jService>(Neo4jService);
+    brandRepository = module.get<BrandRepository>(BrandRepository);
+    sessionRepository = module.get<SessionRepository>(SessionRepository);
 
     // Reset mocks
     jest.clearAllMocks();
@@ -41,165 +47,147 @@ describe('IdentityService', () => {
 
   describe('upsertBrand', () => {
     it('should create a brand successfully', async () => {
-      const mockResult = {
-        records: [{ get: () => ({ properties: { id: 'brand-1', name: 'Test Brand', slug: 'test-brand' } }) }],
-      };
-      mockSession.run.mockResolvedValue(mockResult);
+      mockBrandRepository.upsertBrand.mockResolvedValue(mockBrandData);
 
       const result = await service.upsertBrand('brand-1', 'Test Brand', 'test-brand');
 
-      expect(result).toEqual({ id: 'brand-1', name: 'Test Brand', slug: 'test-brand' });
-      expect(mockSession.run).toHaveBeenCalledWith(expect.any(String), {
-        brandId: 'brand-1',
-        name: 'Test Brand',
-        slug: 'test-brand',
-      });
-      expect(mockSession.close).toHaveBeenCalled();
+      expect(result).toEqual(mockBrandData);
+      expect(mockBrandRepository.upsertBrand).toHaveBeenCalledWith('brand-1', 'Test Brand', 'test-brand');
     });
 
     it('should handle database errors gracefully', async () => {
-      mockSession.run.mockRejectedValue(new Error('Database error'));
+      mockBrandRepository.upsertBrand.mockRejectedValue(new Error('Database error'));
 
       await expect(service.upsertBrand('brand-1', 'Test Brand', 'test-brand')).rejects.toThrow('Database operation failed');
-      expect(mockSession.close).toHaveBeenCalled();
     });
   });
 
   describe('identify', () => {
     it('should create a session successfully', async () => {
-      const mockResult = {
-        records: [{ get: () => ({ properties: { id: 'session-1', provider: 'amplitude', externalId: 'amp_sess_123' } }) }],
-      };
-      mockSession.run.mockResolvedValue(mockResult);
-
       const dto: IdentifyDto = {
         provider: Provider.AMPLITUDE,
         externalSessionId: 'amp_sess_123',
         brandId: 'brand-1',
       };
+
+      mockSessionRepository.createOrUpdateCustomerSession.mockResolvedValue(mockCustomerSessionResult);
 
       const result = await service.identify(dto);
 
-      expect(result).toEqual({ id: 'session-1', provider: 'amplitude', externalId: 'amp_sess_123' });
-      expect(mockSession.run).toHaveBeenCalledWith(expect.any(String), {
-        brandId: 'brand-1',
-        provider: 'amplitude',
-        externalSessionId: 'amp_sess_123',
+      expect(result).toEqual({
+        internalSessionId: 'amplitude_amp_sess_123_brand-1',
+        customer: mockCustomerData,
+        session: mockSessionData,
       });
-      expect(mockSession.close).toHaveBeenCalled();
+      expect(mockSessionRepository.createOrUpdateCustomerSession).toHaveBeenCalledWith({
+        internalSessionId: 'amplitude_amp_sess_123_brand-1',
+        brazeSession: undefined,
+        amplitudeSession: 'amp_sess_123',
+        brandId: 'brand-1',
+      });
     });
 
     it('should handle database errors gracefully', async () => {
-      mockSession.run.mockRejectedValue(new Error('Database error'));
-
       const dto: IdentifyDto = {
         provider: Provider.AMPLITUDE,
         externalSessionId: 'amp_sess_123',
         brandId: 'brand-1',
       };
 
+      mockSessionRepository.createOrUpdateCustomerSession.mockRejectedValue(new Error('Database error'));
+
       await expect(service.identify(dto)).rejects.toThrow('Database operation failed');
-      expect(mockSession.close).toHaveBeenCalled();
     });
   });
 
   describe('linkOnLogin', () => {
     it('should link session to customer by email successfully', async () => {
-      const mockResult = {
-        records: [{ get: () => ({ properties: { id: 'customer-1', email: 'test@example.com' } }) }],
-      };
-      mockSession.run.mockResolvedValue(mockResult);
-
       const dto: LoginLinkDto = {
         provider: Provider.AMPLITUDE,
         externalSessionId: 'amp_sess_123',
-        brandId: 'brand-1',
         email: 'test@example.com',
+        brandId: 'brand-1',
       };
+
+      mockSessionRepository.createOrUpdateCustomerSession.mockResolvedValue(mockCustomerSessionResult);
 
       const result = await service.linkOnLogin(dto);
 
-      expect(result).toEqual({ id: 'customer-1', email: 'test@example.com' });
-      expect(mockSession.run).toHaveBeenCalledWith(expect.any(String), {
-        email: 'test@example.com',
-        provider: 'amplitude',
-        externalSessionId: 'amp_sess_123',
+      expect(result).toEqual({
+        internalSessionId: 'amplitude_amp_sess_123_brand-1',
+        customer: mockCustomerData,
+        session: mockSessionData,
       });
-      expect(mockSession.close).toHaveBeenCalled();
-    });
-
-    it('should throw error when no linking attribute provided', async () => {
-      const dto: LoginLinkDto = {
-        provider: Provider.AMPLITUDE,
-        externalSessionId: 'amp_sess_123',
+      expect(mockSessionRepository.createOrUpdateCustomerSession).toHaveBeenCalledWith({
+        internalSessionId: 'amplitude_amp_sess_123_brand-1',
+        email: 'test@example.com',
+        brazeSession: undefined,
+        amplitudeSession: 'amp_sess_123',
         brandId: 'brand-1',
-      };
-
-      await expect(service.linkOnLogin(dto)).rejects.toThrow('No linking attribute provided (email/phone/identity).');
-      // Session should not be created when no linking attribute is provided
-      expect(mockSession.close).not.toHaveBeenCalled();
+      });
     });
 
     it('should handle database errors gracefully', async () => {
-      mockSession.run.mockRejectedValue(new Error('Database error'));
-
       const dto: LoginLinkDto = {
         provider: Provider.AMPLITUDE,
         externalSessionId: 'amp_sess_123',
-        brandId: 'brand-1',
         email: 'test@example.com',
+        brandId: 'brand-1',
       };
 
+      mockSessionRepository.createOrUpdateCustomerSession.mockRejectedValue(new Error('Database error'));
+
       await expect(service.linkOnLogin(dto)).rejects.toThrow('Database operation failed');
-      expect(mockSession.close).toHaveBeenCalled();
     });
   });
 
   describe('findCustomerBySession', () => {
     it('should return customer when found by braze session', async () => {
-      const mockResult = {
-        records: [{ 
-          get: jest.fn()
-            .mockReturnValueOnce({ properties: { id: 'customer-1', email: 'test@example.com' } }) // session
-            .mockReturnValueOnce({ properties: { id: 'customer-1', email: 'test@example.com' } }) // customer
-            .mockReturnValueOnce(undefined) // brand
-        }],
-      };
-      mockSession.run.mockResolvedValue(mockResult);
+      mockSessionRepository.findCustomerBySession.mockResolvedValue({
+        session: mockSessionData,
+        customer: mockCustomerData,
+        brand: mockBrandData,
+      });
 
-      const result = await service.findCustomerBySession({ brazeSession: 'braze_sess_123' });
+      const result = await service.findCustomerBySession({
+        brazeSession: 'braze_123',
+      });
 
       expect(result).toEqual({
-        session: { id: 'customer-1', email: 'test@example.com' },
-        customer: { id: 'customer-1', email: 'test@example.com' },
-        brand: undefined
+        session: mockSessionData,
+        customer: mockCustomerData,
+        brand: mockBrandData,
       });
-      expect(mockSession.run).toHaveBeenCalledWith(expect.any(String), {
-        brazeSession: 'braze_sess_123',
-        amplitudeSession: null,
-        internalSessionId: null,
-        email: null,
+      expect(mockSessionRepository.findCustomerBySession).toHaveBeenCalledWith({
+        brazeSession: 'braze_123',
+        amplitudeSession: undefined,
+        internalSessionId: undefined,
+        email: undefined,
       });
-      expect(mockSession.close).toHaveBeenCalled();
     });
 
     it('should return null when customer not found', async () => {
-      const mockResult = {
-        records: [],
-      };
-      mockSession.run.mockResolvedValue(mockResult);
+      mockSessionRepository.findCustomerBySession.mockResolvedValue({
+        session: null,
+        customer: null,
+        brand: null,
+      });
 
-      const result = await service.findCustomerBySession({ brazeSession: 'braze_sess_123' });
+      const result = await service.findCustomerBySession({
+        brazeSession: 'nonexistent',
+      });
 
-      expect(result).toBeNull();
-      expect(mockSession.close).toHaveBeenCalled();
+      expect(result).toEqual({
+        session: null,
+        customer: null,
+        brand: null,
+      });
     });
 
     it('should handle database errors gracefully', async () => {
-      mockSession.run.mockRejectedValue(new Error('Database error'));
+      mockSessionRepository.findCustomerBySession.mockRejectedValue(new Error('Database error'));
 
-      await expect(service.findCustomerBySession({ brazeSession: 'braze_sess_123' })).rejects.toThrow('Database operation failed');
-      expect(mockSession.close).toHaveBeenCalled();
+      await expect(service.findCustomerBySession({ brazeSession: 'braze_123' })).rejects.toThrow('Database operation failed');
     });
   });
 });

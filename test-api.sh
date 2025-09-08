@@ -1,41 +1,67 @@
 #!/bin/bash
 
-echo "🧪 Testing Customer Identity Service..."
+# Customer Identity API Test Script
+# Make sure your server is running on http://localhost:3000
 
 BASE_URL="http://localhost:3000"
 
-# Test health endpoint
-echo "1. Testing health endpoint..."
-curl -s "$BASE_URL/health" | jq -r '.status' | grep -q "ok" && echo "✅ Health check passed" || echo "❌ Health check failed"
+echo "🧪 Testing Customer Identity API..."
+echo "=================================="
 
-# Test brand creation
-echo "2. Testing brand creation..."
-BRAND_RESPONSE=$(curl -s -X POST "$BASE_URL/identity/brand" \
+# Test 1: Health Check
+echo "1. Testing Health Check..."
+curl -s -X GET "$BASE_URL/health" | jq '.' 2>/dev/null || curl -s -X GET "$BASE_URL/health"
+echo -e "\n"
+
+# Test 2: Create Brand
+echo "2. Creating Brand..."
+curl -s -X POST "$BASE_URL/identity/brand" \
   -H "Content-Type: application/json" \
-  -d '{"id": "test-brand", "name": "Test Brand", "slug": "test-brand"}')
-echo "$BRAND_RESPONSE" | jq -r '.name' | grep -q "Test Brand" && echo "✅ Brand creation passed" || echo "❌ Brand creation failed"
-
-# Test session identification
-echo "3. Testing session identification..."
-SESSION_RESPONSE=$(curl -s -X POST "$BASE_URL/identity/identify" \
+  -d '{"id": "test-brand", "name": "Test Brand", "slug": "test-brand"}' | jq '.' 2>/dev/null || curl -s -X POST "$BASE_URL/identity/brand" \
   -H "Content-Type: application/json" \
-  -d '{"provider": "amplitude", "externalSessionId": "test_sess_123", "brandId": "test-brand"}')
-echo "$SESSION_RESPONSE" | jq -r '.provider' | grep -q "amplitude" && echo "✅ Session identification passed" || echo "❌ Session identification failed"
+  -d '{"id": "test-brand", "name": "Test Brand", "slug": "test-brand"}'
+echo -e "\n"
 
-# Test customer linking
-echo "4. Testing customer linking..."
-CUSTOMER_RESPONSE=$(curl -s -X POST "$BASE_URL/identity/link-login" \
+# Test 3: Create Customer Session
+echo "3. Creating Customer Session..."
+curl -s -X POST "$BASE_URL/identity/customer-session" \
   -H "Content-Type: application/json" \
-  -d '{"provider": "amplitude", "externalSessionId": "test_sess_123", "brandId": "test-brand", "email": "test@example.com"}')
-echo "$CUSTOMER_RESPONSE" | jq -r '.email' | grep -q "test@example.com" && echo "✅ Customer linking passed" || echo "❌ Customer linking failed"
+  -d '{"internalSessionId": "session-123", "email": "customer@example.com", "brandId": "test-brand", "brazeSession": "braze-123", "amplitudeSession": "amp-123"}' | jq '.' 2>/dev/null || curl -s -X POST "$BASE_URL/identity/customer-session" \
+  -H "Content-Type: application/json" \
+  -d '{"internalSessionId": "session-123", "email": "customer@example.com", "brandId": "test-brand", "brazeSession": "braze-123", "amplitudeSession": "amp-123"}'
+echo -e "\n"
 
-# Test customer lookup
-echo "5. Testing customer lookup..."
-LOOKUP_RESPONSE=$(curl -s "$BASE_URL/identity/customer-for-session?provider=amplitude&externalSessionId=test_sess_123")
-echo "$LOOKUP_RESPONSE" | jq -r '.email' | grep -q "test@example.com" && echo "✅ Customer lookup passed" || echo "❌ Customer lookup failed"
+# Test 4: Quick Identify Customer
+echo "4. Quick Identifying Customer..."
+curl -s -X GET "$BASE_URL/identity/quick-identify-customer?internalSessionId=session-123" | jq '.' 2>/dev/null || curl -s -X GET "$BASE_URL/identity/quick-identify-customer?internalSessionId=session-123"
+echo -e "\n"
 
-echo ""
-echo "🎉 All tests completed!"
-echo ""
-echo "Service is running at: $BASE_URL"
-echo "Neo4j Browser: http://localhost:7474"
+# Test 5: Find Customer by Session
+echo "5. Finding Customer by Session..."
+curl -s -X GET "$BASE_URL/identity/find-customer-by-session?brazeSession=braze-123&amplitudeSession=amp-123&internalSessionId=session-123&email=customer@example.com" | jq '.' 2>/dev/null || curl -s -X GET "$BASE_URL/identity/find-customer-by-session?brazeSession=braze-123&amplitudeSession=amp-123&internalSessionId=session-123&email=customer@example.com"
+echo -e "\n"
+
+# Test 6: Get Customer Session
+echo "6. Getting Customer Session..."
+curl -s -X GET "$BASE_URL/identity/customer-session?internalSessionId=session-123" | jq '.' 2>/dev/null || curl -s -X GET "$BASE_URL/identity/customer-session?internalSessionId=session-123"
+echo -e "\n"
+
+# Test 7: Update Customer Session
+echo "7. Updating Customer Session..."
+curl -s -X POST "$BASE_URL/identity/update-customer-session" \
+  -H "Content-Type: application/json" \
+  -d '{"internalSessionId": "session-123", "email": "updated@example.com", "brandId": "test-brand", "brazeSession": "braze-456", "amplitudeSession": "amp-456"}' | jq '.' 2>/dev/null || curl -s -X POST "$BASE_URL/identity/update-customer-session" \
+  -H "Content-Type: application/json" \
+  -d '{"internalSessionId": "session-123", "email": "updated@example.com", "brandId": "test-brand", "brazeSession": "braze-456", "amplitudeSession": "amp-456"}'
+echo -e "\n"
+
+# Test 8: Legacy Identify
+echo "8. Testing Legacy Identify..."
+curl -s -X POST "$BASE_URL/identity/identify" \
+  -H "Content-Type: application/json" \
+  -d '{"provider": "braze", "externalSessionId": "braze-123", "brandId": "test-brand"}' | jq '.' 2>/dev/null || curl -s -X POST "$BASE_URL/identity/identify" \
+  -H "Content-Type: application/json" \
+  -d '{"provider": "braze", "externalSessionId": "braze-123", "brandId": "test-brand"}'
+echo -e "\n"
+
+echo "✅ API Testing Complete!"

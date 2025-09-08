@@ -18,7 +18,10 @@ export class IdentityController {
   @Post('brand')
   async upsertBrand(@Body() dto: UpsertBrandDto) {
     try {
-      return await this.svc.upsertBrand(dto.id, dto.name, dto.slug);
+      console.log('Controller upsertBrand called with:', dto);
+      const result = await this.svc.upsertBrand(dto.id, dto.name, dto.slug);
+      console.log('Controller returning:', result);
+      return result;
     } catch (error) {
       throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
     }
@@ -88,7 +91,7 @@ export class IdentityController {
   @Get('customer-loyalty-profile')
   async getCustomerLoyaltyProfile(@Query('internalSessionId') internalSessionId: string) {
     try {
-      return await this.svc.getCustomerLoyaltyProfile(internalSessionId);
+      return await this.svc.getCustomerLoyaltyProfile({ internalSessionId });
     } catch (error) {
       throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
     }
